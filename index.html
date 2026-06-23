@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Lato, sans-serif; text-align: center; }
+    #calendar { margin: 20px auto; border-collapse: collapse; width: 90%; max-width: 700px; }
+    #calendar th, #calendar td {
+      border: 1px solid #6C8D13; padding: 10px; width: 14.28%; height: 40px;
+      vertical-align: top; cursor: pointer;
+    }
+    #calendar th { background: #f4f4f4; }
+    #calendar td:hover { background: #f0f8ff; }
+    .today { background: #d1ffd1 !important; font-weight: bold; }
+    .past { background: #f5f5f5; color: #aaa; pointer-events: none; cursor: not-allowed; }
+
+    .header { display: flex; justify-content: center; align-items: center; margin: 10px 0; gap: 10px; }
+    .header button { padding: 5px 10px; }
+
+    .modal { display: none; position: fixed; z-index: 10; left: 0; top: 0;
+             width: 100%; height: 100%; overflow: auto; background: rgba(0,0,0,0.4); }
+    .modal-content {
+      background: #fff; margin: 6% auto; padding: 20px; border: 1px solid #ccc;
+      width: 90%; max-width: 520px; border-radius: 8px; text-align: left;
+    }
+    .close { float: right; font-size: 20px; font-weight: bold; cursor: pointer; }
+
+    .slot-box { margin: 8px 0; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+    .Reservation.approved { background-color: #00563F; color: #fff; border-color: #004733; }
+    .Reservation.pencilbooked { background-color: #fff; color: #c6c6c6; border-color: #666; }
+    .Class.scheduled { background-color: #2A7BAE; color: #fff; border-color: #21628B; }
+    .Class.cancelled { background-color: #e8f7e4; color: rgba(196,23,23,0.6); border-color: #c41717; }
+    .Class.cancelled .muted1 { color: rgba(196,23,23,0.6); }
+    .Class.scheduled .muted1, .Class.approved .muted1 { color: #fff; }
+
+    .muted { color: #666; font-size: 12px; }
+    .muted1 { color: #c6c6c6; font-size: 12px; }
+    .divider { margin: 12px 0; border-top: 1px dashed #bbb; }
+    label { display: block; margin-top: 8px; }
+    select, input[type="time"], input[type="text"], input[type="email"], input[type="number"] {
+      width: 100%; padding: 6px; box-sizing: border-box;
+    }
+    button { margin-top: 10px; padding: 8px 12px; cursor: pointer; }
+    td.disabled {
+      background: #f0f0f0; color: #999;
+      pointer-events: none; position: relative;
+    }
+    .holiday-note { font-size: 10px; color: #b00; margin-top: 2px; }
+
+    .room-select-container {
+      display: flex; flex-direction: column; align-items: center;
+      margin: 20px auto; width: fit-content; font-size: 25px;
+    }
+    .room-select-container label { margin-bottom: 6px; }
+    .room-select-container select {
+      padding: 6px 12px; border: 1px solid #6C8D13;
+      border-radius: 6px; font-size: 30px;
+    }
+    .room-capacity-note { font-size: 14px; color: #00563F; margin-top: 6px; }
+
+    .form-hint { font-size: 10px; color: #777; display: block; margin-top: 3px; margin-bottom: 3px; }
+
+    .error-message {
+      background-color: #ffecec; border: 1px solid #ffb3b3;
+      color: #c41717; padding: 12px; border-radius: 6px;
+      margin: 10px 0; font-size: 14px; display: none;
+    }
+    .time-warning { color: #c41717; font-size: 12px; margin-top: 4px; display: none; }
+    .off-hours-warning {
+      color: #f39c12; font-size: 12px; margin-top: 4px; display: none;
+      background-color: #fff4e6; padding: 8px; border-radius: 4px;
+      border-left: 3px solid #f39c12;
+    }
+    .submit-button {
+      background-color: #00563F; color: white; border: none;
+      padding: 10px 20px; border-radius: 4px; cursor: pointer;
+      font-weight: bold; width: 100%;
+    }
+    .submit-button:disabled { background-color: #cccccc; cursor: not-allowed; }
+    .loading {
+      display: inline-block; width: 20px; height: 20px;
+      border: 3px solid #f3f3f3; border-top: 3px solid #00563F;
+      border-radius: 50%; animation: spin 1s linear infinite;
+      margin-right: 10px; vertical-align: middle;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .off-hours-notice {
+      background-color: #fff4e6; border-left: 4px solid #f39c12;
+      padding: 12px; margin: 20px 0; border-radius: 4px; text-align: left;
+    }
+    .semester-info {
+      background-color: #e8f4f8; border: 1px solid #2A7BAE;
+      border-radius: 6px; padding: 10px 15px;
+      margin: 15px auto; max-width: 700px;
+      font-size: 14px; text-align: center;
+    }
+    .semester-info strong { color: #2A7BAE; }
+    .semester-info.error { background-color: #ffecec; border-color: #c41717; }
+    .semester-info.error strong { color: #c41717; }
+    .class-ended-note {
+      background-color: #fff4e6; border: 1px solid #f39c12;
+      border-radius: 6px; padding: 8px 12px; margin: 10px 0;
+      font-size: 13px; color: #d35400; display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="room-select-container">
+    <label for="roomSelect">Select Room to Reserve:</label>
+    <select id="roomSelect" onchange="onRoomChange()">
+      <option>Loading rooms...</option>
+    </select>
+    <div id="roomCapacityNote" class="room-capacity-note"></div>
+  </div>
+
+  <div id="semesterInfo" class="semester-info">
+    Loading semester information...
+  </div>
+
+  <div id="classEndedNote" class="class-ended-note" style="display: none;">
+    <strong>Note:</strong> Classes are not scheduled during this period. Only reservations are shown.
+  </div>
+
+  <div class="header">
+    <button onclick="prevMonth()">◀</button>
+    <h3 id="monthYear"></h3>
+    <button onclick="nextMonth()">▶</button>
+  </div>
+
+  <table id="calendar"></table>
+
+  <div id="reservationModal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <h3 id="modalDate"></h3>
+      <h4>Classes & Reservations</h4>
+      <div id="existingList">Loading…</div>
+      <div class="divider"></div>
+      <h4>Reserve a Time Slot</h4>
+      <div class="muted">Standard hours: <b>07:00 AM–06:00 PM</b>. For off-hours permission, email <b>che_do.uplb@up.edu.ph</b></div>
+      <div id="formErrorMessage" class="error-message" style="display: none;"></div>
+      <form id="reservationForm">
+        <input type="hidden" id="resDate">
+        <label for="startTime">Start Time:</label>
+        <input type="time" id="startTime" name="startTime" required min="07:00">
+        <div id="startTimeWarning" class="time-warning"></div>
+        <label for="endTime">End Time:</label>
+        <input type="time" id="endTime" name="endTime" required min="07:00">
+        <div id="endTimeWarning" class="time-warning"></div>
+        <div id="offHoursWarning" class="off-hours-warning"></div>
+        <label>Name:</label>
+        <input type="text" id="name" required>
+        <label>Email:</label>
+        <input type="email" id="email" required>
+        <label>Purpose:</label>
+        <input type="text" id="purpose" required>
+        <label for="pax">Number of Pax:</label>
+        <input type="number" id="pax" name="pax" min="1" step="1" required>
+        <small class="form-hint" id="paxHint"></small>
+        <div id="paxWarning" class="time-warning"></div>
+        <div class="form-group">
+          <label for="attachment">Upload Letter of Intent (for NON-CHE constituents)</label>
+          <small class="form-hint">Failure to attach the Letter of Intent will result in disapproval of request.</small>
+          <input type="file" id="attachment" name="attachment" class="form-control-file">
+        </div>
+        <button type="submit" id="submitBtn" class="submit-button">
+          <span id="submitText">Submit Reservation</span>
+          <span id="loadingSpinner" style="display: none;">
+            <div class="loading"></div> Processing...
+          </span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div id="errorModal" class="modal">
+    <div class="modal-content">
+      <span id="closeError" class="close">&times;</span>
+      <h3>Error</h3>
+      <p id="errorMessage"></p>
+    </div>
+  </div>
+
+  <div id="confirmationModal" class="modal">
+    <div class="modal-content">
+      <span id="closeConfirmation" class="close">&times;</span>
+      <div id="confirmationMessage"></div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // 🔑 PASTE YOUR GAS DEPLOYMENT URL HERE
+    // ============================================================
+    const GAS_URL = "YOUR_GAS_URL_HERE";
+
+    // ============================================================
+    // API helper — all calls go through this one function
+    // ============================================================
+    async function api(action, params = {}) {
+      const url = new URL(GAS_URL);
+      url.searchParams.set("action", action);
+      for (const [key, value] of Object.entries(params)) {
+        url.searchParams.set(key, value);
+      }
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error(`Network error: ${res.status}`);
+      return res.json();
+    }
+
+    // ============================================================
+    // State
+    // ============================================================
+    let holidaysMap = {};
+    let roomCapacities = {};
+    let currentDate = new Date();
+    let semesterInfo = null;
+    let isSubmitting = false;
+
+    // ============================================================
+    // On page load — fetch holidays, rooms, semester in parallel
+    // ============================================================
+    window.onload = async () => {
+      try {
+        const [holidays, rooms, semester] = await Promise.all([
+          api("getHolidays"),
+          api("getAvailableRooms"),
+          api("getSemesterInfo")
+        ]);
+
+        // Holidays
+        holidays.forEach(h => { holidaysMap[h.date] = h.name; });
+
+        // Rooms
+        loadRoomsFromData(rooms);
+
+        // Semester
+        applySemesterInfo(semester);
+
+        // Now render calendar (needs holidays + rooms to be ready)
+        renderCalendar(currentDate);
+
+      } catch (err) {
+        console.error("Startup error:", err);
+        document.getElementById("semesterInfo").innerHTML =
+          `<strong>⚠ Error loading data:</strong> ${err.message}`;
+        document.getElementById("semesterInfo").className = "semester-info error";
+      }
+    };
+
+    // ============================================================
+    // Rooms
+    // ============================================================
+    function loadRoomsFromData(rooms) {
+      const select = document.getElementById("roomSelect");
+      select.innerHTML = "";
+      roomCapacities = {};
+
+      if (!rooms || rooms.length === 0) {
+        select.innerHTML = "<option>No rooms available</option>";
+        return;
+      }
+
+      rooms.forEach(room => {
+        const name = (typeof room === "string") ? room : room.name;
+        const capacity = (typeof room === "string") ? null : room.capacity;
+        roomCapacities[name] = capacity;
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+      });
+
+      onRoomChange();
+    }
+
+    function onRoomChange() {
+      const room = document.getElementById("roomSelect").value;
+      const cap = roomCapacities[room];
+      document.getElementById("roomCapacityNote").textContent =
+        (cap != null) ? `Maximum capacity: ${cap} pax` : "";
+      renderCalendar(currentDate);
+    }
+
+    // ============================================================
+    // Semester
+    // ============================================================
+    function applySemesterInfo(info) {
+      semesterInfo = info;
+      const semesterInfoDiv = document.getElementById("semesterInfo");
+      const classEndedNote = document.getElementById("classEndedNote");
+
+      if (!info.hasActiveSemester) {
+        semesterInfoDiv.innerHTML =
+          `<strong>⚠ No Active Semester Found:</strong> ${info.message || "Please set up an active semester."}`;
+        semesterInfoDiv.className = "semester-info error";
+        classEndedNote.style.display = "none";
+      } else {
+        semesterInfoDiv.innerHTML =
+          `<strong>${info.semester}:</strong> Classes scheduled from <strong>${info.formattedStart}</strong> to <strong>${info.formattedEnd}</strong>`;
+        semesterInfoDiv.className = "semester-info";
+
+        const today = new Date();
+        const semStart = new Date(info.semStart);
+        const semEnd = new Date(info.semEnd);
+        semEnd.setHours(23, 59, 59, 999);
+        classEndedNote.style.display = (today < semStart || today > semEnd) ? "block" : "none";
+      }
+    }
+
+    // ============================================================
+    // Calendar
+    // ============================================================
+    function renderCalendar(date) {
+      const month = date.getMonth(), year = date.getFullYear();
+      const today = new Date();
+      const maxDate = new Date(today.getFullYear(), today.getMonth() + 3, today.getDate());
+      const firstDay = new Date(year, month, 1).getDay();
+      const lastDate = new Date(year, month + 1, 0).getDate();
+
+      document.getElementById("monthYear").textContent =
+        date.toLocaleString("default", { month: "long", year: "numeric" });
+
+      const table = document.getElementById("calendar");
+      table.innerHTML = "";
+
+      const headerRow = document.createElement("tr");
+      ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].forEach(d => {
+        const th = document.createElement("th"); th.textContent = d; headerRow.appendChild(th);
+      });
+      table.appendChild(headerRow);
+
+      let row = document.createElement("tr");
+      for (let i = 0; i < firstDay; i++) row.appendChild(document.createElement("td"));
+
+      for (let day = 1; day <= lastDate; day++) {
+        if (row.children.length === 7) { table.appendChild(row); row = document.createElement("tr"); }
+        const cell = document.createElement("td");
+        cell.textContent = day;
+        const cellDate = new Date(year, month, day);
+        const isoDate = `${year}-${String(month+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+        const isSunday = cellDate.getDay() === 0;
+        const holidayName = holidaysMap[isoDate];
+
+        if (
+          cellDate < new Date(today.getFullYear(), today.getMonth(), today.getDate()) ||
+          cellDate > maxDate || isSunday || holidayName
+        ) {
+          cell.classList.add("disabled");
+          cell.style.pointerEvents = "none";
+          cell.style.cursor = "not-allowed";
+          if (holidayName) {
+            const note = document.createElement("div");
+            note.className = "holiday-note";
+            note.textContent = holidayName;
+            cell.appendChild(note);
+          }
+        } else {
+          cell.onclick = () => openModal(year, month, day);
+        }
+
+        if (day === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
+          cell.classList.add("today");
+        }
+        row.appendChild(cell);
+      }
+
+      while (row.children.length < 7) row.appendChild(document.createElement("td"));
+      table.appendChild(row);
+    }
+
+    function prevMonth() { currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()-1, 1); renderCalendar(currentDate); }
+    function nextMonth() { currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth()+1, 1); renderCalendar(currentDate); }
+
+    // ============================================================
+    // Modal
+    // ============================================================
+    async function openModal(year, month, day) {
+      const date = new Date(year, month, day);
+      const chosenDate = date.toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" });
+      const room = document.getElementById("roomSelect").value;
+
+      document.getElementById("modalDate").textContent = `Details for ${chosenDate} — ${room}`;
+      document.getElementById("resDate").value = chosenDate;
+      document.getElementById("existingList").innerHTML = "Loading…";
+      document.getElementById("reservationModal").style.display = "block";
+
+      document.getElementById("reservationForm").reset();
+      hideFormError();
+      hideOffHoursWarning();
+      document.getElementById("paxWarning").style.display = "none";
+      enableSubmitButton();
+
+      const cap = roomCapacities[room];
+      const paxInput = document.getElementById("pax");
+      const paxHint = document.getElementById("paxHint");
+      if (cap != null) {
+        paxInput.max = cap;
+        paxHint.textContent = `Maximum capacity for ${room}: ${cap} pax`;
+      } else {
+        paxInput.removeAttribute("max");
+        paxHint.textContent = "";
+      }
+
+      try {
+        const list = await api("getSchedulesForDate", { date: chosenDate, room });
+
+        const filteredList = (list || []).filter(item => {
+          if (item.type === "Reservation") {
+            const s = (item.status || "").toLowerCase();
+            return s !== "cancelled" && s !== "disapproved";
+          }
+          return true;
+        });
+
+        if (filteredList.length === 0) {
+          document.getElementById("existingList").innerHTML = "<i>No classes or reservations yet.</i>";
+        } else {
+          const hasClasses = filteredList.some(item => item.type === "Class");
+          let headerHTML = "";
+          if (!hasClasses && semesterInfo && semesterInfo.hasActiveSemester) {
+            const selectedDate = new Date(chosenDate);
+            const semStart = new Date(semesterInfo.semStart);
+            const semEnd = new Date(semesterInfo.semEnd);
+            semEnd.setHours(23, 59, 59, 999);
+            if (selectedDate < semStart || selectedDate > semEnd) {
+              headerHTML = `<div class="class-ended-note" style="margin-bottom:15px;">
+                <strong>Note:</strong> Classes are not scheduled during this period.
+              </div>`;
+            }
+          }
+          document.getElementById("existingList").innerHTML = headerHTML + filteredList.map(item => {
+            const typeClass = item.type || "";
+            const statusClass = (item.status || "").toLowerCase().replace(/\s+/g, "");
+            const paxLine = (item.pax !== undefined && item.pax !== null && item.pax !== "")
+              ? `<br><span class="muted1">Pax: ${item.pax}</span>` : "";
+            return `<div class="slot-box ${typeClass} ${statusClass}">
+              <b>${item.startTime} - ${item.endTime}</b> — ${item.type === "Class" ? "Class" : "Reservation"}
+              <br>${item.purpose}
+              <br><span class="muted1">Status: ${item.status}</span>
+              ${paxLine}
+            </div>`;
+          }).join("");
+        }
+      } catch (err) {
+        document.getElementById("existingList").innerHTML = `<i>Error loading schedules: ${err.message}</i>`;
+      }
+    }
+
+    function closeModal() { document.getElementById("reservationModal").style.display = "none"; }
+    function closeErrorModal() { document.getElementById("errorModal").style.display = "none"; }
+
+    function showFormError(message) {
+      const errorDiv = document.getElementById("formErrorMessage");
+      errorDiv.textContent = message;
+      errorDiv.style.display = "block";
+      errorDiv.scrollIntoView({ behavior: "smooth" });
+    }
+    function hideFormError() { document.getElementById("formErrorMessage").style.display = "none"; }
+    function showOffHoursWarning(message) {
+      const w = document.getElementById("offHoursWarning");
+      w.innerHTML = `<strong>⚠ Note:</strong> ${message}`;
+      w.style.display = "block";
+    }
+    function hideOffHoursWarning() { document.getElementById("offHoursWarning").style.display = "none"; }
+    function showLoading() {
+      isSubmitting = true;
+      document.getElementById("loadingSpinner").style.display = "inline-block";
+      document.getElementById("submitText").style.display = "none";
+      document.getElementById("submitBtn").disabled = true;
+    }
+    function hideLoading() {
+      isSubmitting = false;
+      document.getElementById("loadingSpinner").style.display = "none";
+      document.getElementById("submitText").style.display = "inline";
+      document.getElementById("submitBtn").disabled = false;
+    }
+    function enableSubmitButton() {
+      document.getElementById("submitBtn").disabled = false;
+      isSubmitting = false;
+    }
+
+    // ============================================================
+    // Validation
+    // ============================================================
+    function convert24to12(time24) {
+      let [hour, minute] = time24.split(":").map(Number);
+      let ampm = hour >= 12 ? "PM" : "AM";
+      hour = hour % 12 || 12;
+      return `${hour}:${minute.toString().padStart(2, "0")} ${ampm}`;
+    }
+
+    function validateTimes() {
+      const startTime = document.getElementById("startTime").value;
+      const endTime = document.getElementById("endTime").value;
+      const startWarning = document.getElementById("startTimeWarning");
+      const endWarning = document.getElementById("endTimeWarning");
+
+      startWarning.style.display = "none";
+      endWarning.style.display = "none";
+      hideOffHoursWarning();
+
+      let isValid = true;
+      if (startTime && endTime) {
+        const toMinutes = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+        const startMinutes = toMinutes(startTime);
+        const endMinutes = toMinutes(endTime);
+
+        if (startMinutes >= endMinutes) {
+          endWarning.textContent = "End time must be after start time";
+          endWarning.style.display = "block";
+          isValid = false;
+        }
+        if (startMinutes < 7 * 60) {
+          startWarning.textContent = "Earliest start time is 7:00 AM";
+          startWarning.style.display = "block";
+          isValid = false;
+        }
+        if (endMinutes > 18 * 60) {
+          const hasAttachment = document.getElementById("attachment").files.length > 0;
+          showOffHoursWarning(
+            "Your reservation extends beyond standard hours (after 6:00 PM). " +
+            "There is no guarantee on your request since it is an off hour. " +
+            (hasAttachment
+              ? "Your Letter of Intent will be reviewed for this off-hours request."
+              : "Please submit a Letter of Intent for further evaluation.")
+          );
+        }
+      }
+      return isValid;
+    }
+
+    function validatePax() {
+      const paxInput = document.getElementById("pax");
+      const paxWarning = document.getElementById("paxWarning");
+      const room = document.getElementById("roomSelect").value;
+      const cap = roomCapacities[room];
+
+      paxWarning.style.display = "none";
+      if (paxInput.value === "") return false;
+
+      const val = parseInt(paxInput.value, 10);
+      if (isNaN(val) || val < 1) {
+        paxWarning.textContent = "Please enter at least 1 pax.";
+        paxWarning.style.display = "block";
+        return false;
+      }
+      if (cap != null && val > cap) {
+        paxWarning.textContent = `Only ${cap} pax ${cap === 1 ? "is" : "are"} allowed in ${room}.`;
+        paxWarning.style.display = "block";
+        return false;
+      }
+      return true;
+    }
+
+    function refreshValidation() {
+      const timesOk = validateTimes();
+      const paxOk = validatePax();
+      document.getElementById("submitBtn").disabled = !(timesOk && paxOk);
+    }
+
+    ["startTime","endTime","pax"].forEach(id => {
+      document.getElementById(id).addEventListener("change", refreshValidation);
+      document.getElementById(id).addEventListener("input", refreshValidation);
+    });
+    document.getElementById("attachment").addEventListener("change", refreshValidation);
+
+    // ============================================================
+    // Form submit
+    // ============================================================
+    document.getElementById("reservationForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      if (isSubmitting) return;
+      if (!validateTimes()) { showFormError("Please fix the time errors before submitting."); return; }
+      if (!validatePax()) { showFormError("Please fix the number of pax before submitting."); return; }
+
+      const startTimeValue = document.getElementById("startTime").value;
+      const endTimeValue = document.getElementById("endTime").value;
+
+      const fileInput = document.getElementById("attachment");
+      let attachment = null, attachmentName = null, attachmentType = null;
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        attachmentName = file.name;
+        attachmentType = file.type;
+        attachment = await toBase64(file);
+      }
+
+      const data = {
+        date: document.getElementById("resDate").value,
+        startTime: convert24to12(startTimeValue),
+        endTime: convert24to12(endTimeValue),
+        room: document.getElementById("roomSelect").value,
+        name: document.getElementById("name").value,
+        email: document.getElementById("email").value,
+        purpose: document.getElementById("purpose").value,
+        pax: parseInt(document.getElementById("pax").value, 10),
+        attachment, attachmentName, attachmentType
+      };
+
+      showLoading();
+      hideFormError();
+
+      try {
+        // saveReservation sends data as a JSON string in the body param
+        const url = new URL(GAS_URL);
+        url.searchParams.set("action", "saveReservation");
+        url.searchParams.set("body", JSON.stringify(data));
+
+        const res = await fetch(url.toString());
+        const response = await res.json();
+        hideLoading();
+
+        if (response.success) {
+          closeModal();
+          let confirmationHTML = `
+            <div style="text-align:center;">
+              <h3 style="color:#00563F;margin-bottom:20px;">Reservation Submitted Successfully!</h3>
+              <p style="margin-bottom:10px;color:#666;">Your reservation code is:</p>
+              <div style="font-size:28px;font-weight:bold;color:#00563F;
+                   margin:20px 0;padding:10px;background-color:#f8f9fa;
+                   border-radius:6px;border:1px solid #dee2e6;">
+                ${response.code}
+              </div>
+              <p style="color:#666;">Number of pax: <strong>${response.pax}</strong></p>`;
+
+          if (response.isOffHours) {
+            confirmationHTML += `
+              <div class="off-hours-notice">
+                <strong>⚠️ Off-Hours Reservation Notice:</strong><br>
+                ${response.offHoursWarning}
+              </div>`;
+          }
+
+          confirmationHTML += `
+              <p style="font-size:14px;color:#666;margin-top:20px;">
+                Please keep this code for your reference.
+              </p>
+            </div>`;
+
+          document.getElementById("confirmationMessage").innerHTML = confirmationHTML;
+          document.getElementById("confirmationModal").style.display = "block";
+        } else {
+          if (response.isDuplicate) showFormError(response.error + " If you think this is an error, please contact the administrator.");
+          else if (response.invalidTime) showFormError("Time error: " + response.error);
+          else if (response.paxError) showFormError("Capacity error: " + response.error);
+          else if (response.timeConflict) showFormError("Scheduling conflict: " + response.error);
+          else if (response.dateRestriction) showFormError("Date restriction: " + response.error);
+          else showFormError("Error: " + response.error);
+        }
+      } catch (err) {
+        hideLoading();
+        showFormError("Server error: " + err.message);
+      }
+    });
+
+    function toBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = error => reject(error);
+      });
+    }
+
+    // ============================================================
+    // Modal close handlers
+    // ============================================================
+    document.getElementById("closeConfirmation").addEventListener("click", () => {
+      document.getElementById("confirmationModal").style.display = "none";
+    });
+    document.getElementById("closeError").addEventListener("click", closeErrorModal);
+
+    window.onclick = function(event) {
+      ["reservationModal","confirmationModal","errorModal"].forEach(id => {
+        const modal = document.getElementById(id);
+        if (event.target === modal) {
+          if (id === "reservationModal") closeModal();
+          else if (id === "confirmationModal") document.getElementById("confirmationModal").style.display = "none";
+          else closeErrorModal();
+        }
+      });
+    };
+
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "Escape") {
+        closeModal();
+        document.getElementById("confirmationModal").style.display = "none";
+        closeErrorModal();
+      }
+    });
+  </script>
+</body>
+</html>
