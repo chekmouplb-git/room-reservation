@@ -78,7 +78,7 @@
       padding: 0 12px;
     }
     .navbar-title-block h1 {
-      font-size: clamp(30px, 5vw, 20px);
+      font-size: clamp(15px, 5vw, 30px);
       font-weight: 700;
       color: #fff;
       line-height: 1;
@@ -383,7 +383,7 @@
     }
     .form-row { display: grid; gap: 10px; margin-bottom: 10px; }
     .form-row.two-col { grid-template-columns: 1fr 1fr; }
-    @media (max-width: 400px) { .form-row.two-col { grid-template-columns: 1fr; } }
+    @media (max-width: 320px) { .form-row.two-col { grid-template-columns: 1fr; } }
 
     .form-group { display: flex; flex-direction: column; gap: 4px; }
     .form-group label {
@@ -403,6 +403,9 @@
       background: #fff;
       width: 100%;
       transition: border-color 0.15s;
+      min-height: 48px;
+      appearance: none;
+      -webkit-appearance: none;
     }
     .form-group input:focus {
       outline: none;
