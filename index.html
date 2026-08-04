@@ -700,6 +700,30 @@
       return res.json();
     }
 
+    // POST variant — use this for anything with a payload (attachments, form bodies).
+    // Content-Type is text/plain on purpose: it keeps the request "simple" so the
+    // browser skips the CORS preflight, which Apps Script cannot answer.
+    async function apiPost(action, payload) {
+      const url = new URL(GAS_URL);
+      url.searchParams.set("action", action);
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+        redirect: "follow"
+      });
+      if (!res.ok) throw new Error(`Network error: ${res.status}`);
+      const text = await res.text();
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new Error("Server returned an unexpected response. Check the Apps Script deployment.");
+      }
+    }
+
+    // Attachments are base64-encoded, which inflates them by ~33%.
+    const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024; // 5 MB
+
     let holidaysMap = {}, roomCapacities = {}, semesterInfo = null;
     let currentDate = new Date(), isSubmitting = false;
 
@@ -1016,6 +1040,10 @@
       let attachment = null, attachmentName = null, attachmentType = null;
       if (fileInput.files.length > 0) {
         const file = fileInput.files[0];
+        if (file.size > MAX_ATTACHMENT_BYTES) {
+          showFormError(`Attachment is too large (${(file.size / 1048576).toFixed(1)} MB). Maximum is 5 MB.`);
+          return;
+        }
         attachmentName = file.name; attachmentType = file.type;
         attachment = await toBase64(file);
       }
@@ -1032,14 +1060,10 @@
         attachment, attachmentName, attachmentType
       };
 
-      showLoading(); hideFormError();
+      showLoading(); hideFormError(); // showLoading() sets isSubmitting = true
 
       try {
-        const url = new URL(GAS_URL);
-        url.searchParams.set("action", "saveReservation");
-        url.searchParams.set("body", JSON.stringify(data));
-        const res  = await fetch(url.toString());
-        const resp = await res.json();
+        const resp = await apiPost("saveReservation", data);
         hideLoading();
 
         if (resp.success) {
@@ -1068,6 +1092,8 @@
       } catch (err) {
         hideLoading();
         showFormError("Server error: " + err.message);
+      } finally {
+        isSubmitting = false;
       }
     });
 
