@@ -1,0 +1,15 @@
+{
+  "name": "che-room-reservation",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test/test-api.mjs && node test/test-frontend.mjs",
+    "test:api": "node test/test-api.mjs",
+    "test:ui": "node test/test-frontend.mjs",
+    "measure": "node test/measure.mjs ./test/Code_v1.gs && node test/measure.mjs ./Code.gs --bootstrap"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}
