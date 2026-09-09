@@ -24,6 +24,7 @@
       --amber-light: #fff4e6;
       --red:         #c41717;
       --red-light:   #ffecec;
+      --maroon:      #7a1f2b;
       --gray-100:    #f4f4f4;
       --gray-200:    #e0e0e0;
       --gray-400:    #999;
@@ -181,6 +182,13 @@
       margin-bottom: 12px;
       display: none;
     }
+    .non-che-notice {
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--maroon);
+      margin-bottom: 12px;
+    }
+    .non-che-notice strong { font-weight: 700; }
 
     /* CALENDAR CARD */
     .calendar-card {
@@ -563,6 +571,12 @@
       <strong>Note:</strong> Classes are not scheduled during this period. Only reservations are shown.
     </div>
 
+    <div id="nonCheNotice" class="non-che-notice">
+      <strong>For Non-CHE Constituents:</strong> please submit your reservation
+      <strong>ONE WEEK</strong> before the target event date. It will be
+      updated within the said time frame.
+    </div>
+
     <div class="calendar-card">
       <div class="calendar-nav">
         <button class="nav-btn" onclick="prevMonth()" aria-label="Previous month">&#8249;</button>
@@ -682,6 +696,27 @@
         <button class="close-btn" id="closeError" aria-label="Close">&times;</button>
       </div>
       <p id="errorMessage" style="font-size:14px; color:var(--gray-600);"></p>
+    </div>
+  </div>
+
+  <!-- LATE SUBMISSION NOTICE MODAL -->
+  <!-- Shown only when a Letter of Intent is attached and the event is
+       less than a week away. This is a heads-up, not a block — clicking
+       Continue submits the reservation exactly as usual. -->
+  <div id="lateNoticeModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="lateNoticeTitle">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="lateNoticeTitle" style="color:#7a4f00;">Submitting less than a week out</h3>
+        <button class="close-btn" id="closeLateNotice" aria-label="Close">&times;</button>
+      </div>
+      <div class="confirm-note">
+        You are submitting this reservation less than a week before your event.
+        We will do our best to accommodate, updates may take at least one business day before your event. 
+        Please allow time for processing.
+      </div>
+      <button type="button" id="lateNoticeContinue" class="submit-btn" style="margin-top:14px;">
+        Continue and submit
+      </button>
     </div>
   </div>
 
@@ -827,6 +862,7 @@
     let holidaysMap = {}, roomCapacities = {}, semesterInfo = null;
     let currentDate = new Date(), isSubmitting = false;
     let currentDaySchedules = [];   // blocking entries for the open day+room
+    let selectedResDate = null;     // Date object for the day the modal is open on
 
     window.onload = async () => {
       renderCalendar(currentDate);
@@ -859,13 +895,14 @@
 
       document.addEventListener("keydown", e => {
         if (e.key !== "Escape") return;
+        document.getElementById("lateNoticeModal").classList.remove("is-open");
         closeModal();
         closeErrorModal();
         document.getElementById("confirmationModal").classList.remove("is-open");
       });
 
       window.onclick = e => {
-        ["reservationModal","confirmationModal","errorModal"].forEach(id => {
+        ["reservationModal","confirmationModal","errorModal","lateNoticeModal"].forEach(id => {
           if (e.target === document.getElementById(id)) {
             if (id === "reservationModal") closeModal();
             else document.getElementById(id).classList.remove("is-open");
@@ -997,6 +1034,7 @@
 
       document.getElementById("modalTitle").textContent = `${chosenDate} — ${room}`;
       document.getElementById("resDate").value = chosenDate;
+      selectedResDate = date;
       document.getElementById("existingList").innerHTML =
         `<div class="skeleton-bar" style="width:65%"></div><div class="skeleton-bar" style="width:45%"></div>`;
       document.getElementById("reservationModal").classList.add("is-open");
@@ -1161,6 +1199,17 @@
       return null;
     }
 
+    // Whole calendar days between today and the selected event date.
+    // Used only to decide whether to show the late-submission heads-up —
+    // it never blocks anything itself.
+    function daysUntilSelectedDate() {
+      if (!selectedResDate) return null;
+      const evt = new Date(selectedResDate.getFullYear(), selectedResDate.getMonth(), selectedResDate.getDate());
+      const today = new Date();
+      const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      return Math.round((evt - todayMid) / 86400000);
+    }
+
     function refreshValidation() {
       const tok = validateTimes(), pok = validatePax();
       const clash = findConflict();
@@ -1188,6 +1237,27 @@
         return;
       }
 
+      // Non-CHE constituents are asked (not required) to book a week out.
+      // Nothing here blocks submission — a Letter of Intent attached less
+      // than a week before the event just gets a heads-up first.
+      const hasFile = document.getElementById("attachment").files.length > 0;
+      const daysOut = daysUntilSelectedDate();
+      if (hasFile && daysOut !== null && daysOut < 7) {
+        document.getElementById("lateNoticeModal").classList.add("is-open");
+        return;
+      }
+
+      await submitReservation();
+    });
+
+    document.getElementById("lateNoticeContinue").onclick = async () => {
+      document.getElementById("lateNoticeModal").classList.remove("is-open");
+      await submitReservation();
+    };
+    document.getElementById("closeLateNotice").onclick = () =>
+      document.getElementById("lateNoticeModal").classList.remove("is-open");
+
+    async function submitReservation() {
       const fileInput = document.getElementById("attachment");
       let attachment = null, attachmentName = null, attachmentType = null;
       if (fileInput.files.length > 0) {
@@ -1249,7 +1319,7 @@
       } finally {
         isSubmitting = false;
       }
-    });
+    }
 
     function toBase64(file) {
       return new Promise((resolve, reject) => {
