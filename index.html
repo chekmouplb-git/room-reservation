@@ -558,6 +558,28 @@
 
   <main class="page-body">
 
+    <!-- ===== RENOVATION NOTICE (temporary) — delete this whole block to remove ===== -->
+    <style>
+      .renovation-notice {
+        background: var(--amber-light);
+        border: 1px solid #f5d08a;
+        border-left: 4px solid #e0a100;
+        border-radius: var(--radius-md);
+        padding: 10px 16px;
+        font-size: 13px;
+        line-height: 1.45;
+        color: #7a4f00;
+        margin-bottom: 12px;
+      }
+      .renovation-notice strong { font-weight: 700; }
+    </style>
+    <div class="renovation-notice" role="status">
+      <strong>Notice:</strong> The CHE Lobby and Conference Room will be temporarily
+      closed for renovation from <strong>1 October to 18 December 2026</strong>.
+      We apologize for any inconvenience.
+    </div>
+    <!-- ===== END RENOVATION NOTICE ===== -->
+
     <div class="room-selector-card">
       <label for="roomSelect">Room</label>
       <select id="roomSelect" onchange="onRoomChange()">
