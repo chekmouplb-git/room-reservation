@@ -344,7 +344,8 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
-    .form-group input {
+    .form-group input,
+    .form-group textarea {
       padding: 10px 12px;
       border: 1.5px solid var(--border);
       border-radius: var(--radius-sm);
@@ -358,7 +359,9 @@
       appearance: none;
       -webkit-appearance: none;
     }
-    .form-group input:focus {
+    .form-group textarea { resize: vertical; min-height: 84px; line-height: 1.4; }
+    .form-group input:focus,
+    .form-group textarea:focus {
       outline: none;
       border-color: var(--green-mid);
       box-shadow: 0 0 0 3px rgba(108,141,19,0.12);
@@ -619,6 +622,20 @@
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group">
+            <label for="specialRequest">Special requests / instructions (optional)</label>
+            <textarea id="specialRequest" rows="3" maxlength="500"
+              placeholder="e.g. TV, microphone, extra chairs, room setup"></textarea>
+            <span class="field-hint">Let the approver know about any equipment or setup you need.</span>
+            <div id="specialRequestNote" class="off-hours-warning">
+              <strong>⚠ Note:</strong> Since your event is today or tomorrow, there may not
+              be enough time to prepare your special request, and we cannot guarantee it
+              will be accommodated.
+            </div>
+          </div>
+        </div>
+
         <button type="submit" id="submitBtn" class="submit-btn">
           <span id="submitText">Submit reservation</span>
           <span class="spinner" id="loadingSpinner"></span>
@@ -673,7 +690,7 @@
     // ============================================================
     // PASTE YOUR GAS DEPLOYMENT URL HERE
     // ============================================================
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzT92axNcdnVhSsmott-EoCkFlqahgL_K5TN6cQFC1LIWeSShxrUazFFP91QsmlCrwl2g/exec";
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzldHKrpni2MMm3YxA-6OOj7DjNGx2R9yFeuW0GS85YDC-XZ9T5lQkrrigs1IloqdNdjw/exec";
 
     const REQUEST_TIMEOUT = 30000;
     const MAX_RETRIES = 3;
@@ -837,6 +854,7 @@
         document.getElementById(id).addEventListener("change", refreshValidation);
       });
       document.getElementById("attachment").addEventListener("change", refreshValidation);
+      document.getElementById("specialRequest").addEventListener("input", updateSpecialRequestNote);
 
       document.getElementById("closeConfirmation").onclick = () =>
         document.getElementById("confirmationModal").classList.remove("is-open");
@@ -995,6 +1013,7 @@
       ["paxWarning","startTimeWarning","endTimeWarning"].forEach(id =>
         document.getElementById(id).style.display = "none");
       enableSubmit();
+      updateSpecialRequestNote();
 
       const cap = roomCapacities[room];
       const paxInput = document.getElementById("pax");
@@ -1159,6 +1178,15 @@
       return Math.round((evt - todayMid) / 86400000);
     }
 
+    // A special request made the day before (or the day of) the event may
+    // not leave enough time to prepare. Heads-up only — never blocks.
+    function updateSpecialRequestNote() {
+      const hasRequest = document.getElementById("specialRequest").value.trim() !== "";
+      const daysOut = daysUntilSelectedDate();
+      document.getElementById("specialRequestNote").style.display =
+        hasRequest && daysOut !== null && daysOut <= 1 ? "block" : "none";
+    }
+
     function refreshValidation() {
       const tok = validateTimes(), pok = validatePax();
       const clash = findConflict();
@@ -1228,6 +1256,7 @@
         email:          document.getElementById("email").value,
         purpose:        document.getElementById("purpose").value,
         pax:            parseInt(document.getElementById("pax").value, 10),
+        specialRequest: document.getElementById("specialRequest").value.trim(),
         attachment, attachmentName, attachmentType
       };
 
