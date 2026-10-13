@@ -289,6 +289,50 @@
     }
     .close-btn:hover { background: var(--gray-200); }
 
+    /* RESERVATION MODAL — landscape on tablet/desktop, stacked on phones */
+    @media (min-width: 768px) {
+      .modal-content--wide {
+        max-width: 1040px;
+        height: calc(100vh - 48px);
+        max-height: 820px;
+        display: flex;
+        flex-direction: column;
+        padding: 20px 0 0;
+        overflow: hidden;
+      }
+      .modal.is-open:has(.modal-content--wide) {
+        align-items: center;
+        padding: 24px;
+      }
+      .modal-content--wide .modal-header {
+        padding: 0 24px 14px;
+        margin-bottom: 0;
+        border-bottom: 1px solid var(--gray-200);
+      }
+      .modal-body {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(260px, 34%) 1fr;
+      }
+      .modal-body > hr.divider { display: none; }
+      .modal-pane {
+        overflow-y: auto;
+        padding: 18px 24px 24px;
+        overscroll-behavior: contain;
+      }
+      .modal-pane--schedule {
+        background: var(--gray-100);
+        border-right: 1px solid var(--gray-200);
+      }
+      .form-row.wide-two-col { grid-template-columns: 1fr 1fr; }
+      .modal-pane--form .submit-btn {
+        position: sticky;
+        bottom: 0;
+        box-shadow: 0 -12px 16px -8px #fff;
+      }
+    }
+
     /* SCHEDULE SLOTS */
     .section-label {
       font-size: 11px;
@@ -549,20 +593,24 @@
 
   <!-- RESERVATION MODAL -->
   <div id="reservationModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-    <div class="modal-content">
+    <div class="modal-content modal-content--wide">
       <div class="modal-header">
         <h3 id="modalTitle">Details</h3>
         <button class="close-btn" onclick="closeModal()" aria-label="Close">&times;</button>
       </div>
 
+      <div class="modal-body">
+      <section class="modal-pane modal-pane--schedule">
       <p class="section-label">Classes &amp; reservations</p>
       <div id="existingList">
         <div class="skeleton-bar" style="width:70%"></div>
         <div class="skeleton-bar" style="width:50%"></div>
       </div>
+      </section>
 
       <hr class="divider">
 
+      <section class="modal-pane modal-pane--form">
       <p class="form-section-title">Reserve a time slot</p>
       <div class="form-hint-bar">
         Standard hours: <strong>7:00 AM – 6:00 PM</strong>. Off-hours requests: <strong>che_do.uplb@up.edu.ph</strong>
@@ -587,14 +635,11 @@
         </div>
         <div id="offHoursWarning" class="off-hours-warning"></div>
 
-        <div class="form-row">
+        <div class="form-row wide-two-col">
           <div class="form-group">
             <label for="name">Full name</label>
             <input type="text" id="name" placeholder="Juan dela Cruz" required>
           </div>
-        </div>
-
-        <div class="form-row">
           <div class="form-group">
             <label for="email">Email address</label>
             <input type="email" id="email" placeholder="juan@up.edu.ph" required>
@@ -641,6 +686,8 @@
           <span class="spinner" id="loadingSpinner"></span>
         </button>
       </form>
+      </section>
+      </div>
     </div>
   </div>
 
@@ -1009,6 +1056,7 @@
 
       currentDaySchedules = [];
       document.getElementById("reservationForm").reset();
+      document.querySelectorAll("#reservationModal, #reservationModal .modal-pane").forEach(el => el.scrollTop = 0);
       hideFormError(); hideOffHoursWarning();
       ["paxWarning","startTimeWarning","endTimeWarning"].forEach(id =>
         document.getElementById(id).style.display = "none");
